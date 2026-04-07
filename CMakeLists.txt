@@ -16,7 +16,15 @@ set(BOOST_ROOT "C:/Boost/boost_1_90_0")
 find_package(Boost REQUIRED)
 
 # Добавьте источник в исполняемый файл этого проекта.
-add_executable (HotKeyHub_Host "src/cpp/main.cpp" "src/cpp/server.cpp" "src/header/server.h")
+add_executable (HotKeyHub_Host 
+"src/cpp/main.cpp"
+"src/cpp/server.cpp"
+"src/header/server.h"
+"src/cpp/systemController.cpp"
+"src/header/systemController.h"
+"src/header/session.h"
+"src/cpp/session.cpp"
+)
 
 target_link_libraries(HotKeyHub_Host PRIVATE Boost::headers)
 
