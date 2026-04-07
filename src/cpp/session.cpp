@@ -1,4 +1,6 @@
+#include<boost/json/src.hpp>
 #include "../../src/header/session.h"
+
 
 
 Session::Session(boost::asio::ip::tcp::socket socket):socket_(std::move(socket)){}
