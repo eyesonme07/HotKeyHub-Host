@@ -1,113 +1,131 @@
 #include<boost/json/src.hpp>
 #include "../../src/header/session.h"
 
+//тут забираем сокет к себе
+Session::Session(boost::asio::ip::tcp::socket socket)
+	: socket_(std::move(socket))
+	, loadTimer_(socket_.get_executor()) {}
 
 
-Session::Session(boost::asio::ip::tcp::socket socket):socket_(std::move(socket)){}
-
+//начало инициализации сессии, отправляем клиенту статус подключения и запускаем таймер для загрузки данных(текущая песня громкость и тд)
 void Session::start()
 {
+	boost::json::value connect_response = {
+		{"status", "connected"}
+	};
+	sendJson(connect_response);
+
+	recursiveTimer(loadTimer_);
+
 	do_read_header();
 }
 
+//тут читаем сколько данных пришло(размер)
 void Session::do_read_header()
 {
+	//получаем указатель на себя
 	auto self = shared_from_this();
 
+	//читаем первые 4 байта, в которых будет размер данных
 	boost::asio::async_read(socket_, boost::asio::buffer(buffer_head_, 4),
 		[this,self](const boost::system::error_code& error, const std::size_t bytes){
-
+			//если ошибка
 			if (error) {
 				std::cout << "Error reading header (error - " << error.what() << " )" << '\n';
 				return;
 			}
 
-			uint64_t net_length{};
+			//получаем размер данных, который нам нужно прочитать
+			uint32_t net_length{};
 			std::memcpy(&net_length, buffer_head_, 4);
-			uint64_t length = ntohl(net_length);
+			uint32_t length = ntohl(net_length);
 
+			//меняем размер вектора под размер полученных данных
 			buffer_data_.resize(length);
+			//читаем уже готовый ответ
 			do_read_body(length);
 	});
 }
 
 void Session::do_read_body(std::size_t length)
 {
+	//получаем указатель на себя
 	auto self = shared_from_this();
 
+	//читаем данные в буфер
 	boost::asio::async_read(socket_, boost::asio::buffer(buffer_data_.data(), length),
 		[this,self](const boost::system::error_code& error, const std::size_t bytes){
 			if (error) {
 				std::cout << "Error reading body (error - " << error.what() << " )" << '\n';
 				return;
 			}
+			//получаем строку из буфера
 			std::string json_str(buffer_data_.begin(), buffer_data_.end());
-			
-			std::cout << "Получено сообщение от "<<socket_.remote_endpoint().address().to_string()<<"\nСООБЩЕНИЕ:\n" << json_str << std::endl;
-
+			//парсим строку в json
 			boost::json::value json_value = boost::json::parse(json_str);
-			processJson(json_value);
+			//обрабатываем json
+			jsonParse_.parse(json_value);
+			//начинаем читать заново
 			do_read_header();
 		});
 }
-
-void Session::processJson(const boost::json::value & value)
+//отправляем json обратно клиенту(статус и т.д.)
+void Session::sendJson(const boost::json::value& value)
 {
-	if (value.is_object())
-	{
-		const boost::json::object& obj = value.as_object();
-		if (obj.contains("command"))
-		{
-			std::string command = obj.at("command").as_string().c_str();
+	// Сериализуем JSON в строку
+	std::string body = boost::json::serialize(value);
 
-			if (command == "play_pause")
-			{
-				systemController_.SendMediaKey(VK_MEDIA_PLAY_PAUSE);
-			}
-			else if (command == "next")
-			{
-				systemController_.SendMediaKey(VK_MEDIA_NEXT_TRACK);
-			}
-			else if (command == "previous")
-			{
-				systemController_.SendMediaKey(VK_MEDIA_PREV_TRACK);
-			}
-			else if (command == "volume_up")
-			{
-				float currentVolume;
-				HRESULT hr = systemController_.GetSystemVolume(&currentVolume);
+	// Длина тела
+	uint32_t length = static_cast<uint32_t>(body.size());
+	uint32_t net_length = htonl(length);
 
-				if (SUCCEEDED(hr)) {
-
-					currentVolume += 0.1f; // Увеличиваем громкость на 10%
-					if (currentVolume > 1.0f) currentVolume = 1.0f; // Максимальная громкость - 100%
-					hr = systemController_.SetSystemVolume(currentVolume);
-					if (FAILED(hr)) {
-						std::cout << "Failed to set volume (error - " << hr << " )" << std::endl;
-					}
-				}
-			}
-			else if (command == "volume_down")
-			{
-				float currentVolume;
-				HRESULT hr = systemController_.GetSystemVolume(&currentVolume);
-				if (SUCCEEDED(hr)) {
-					currentVolume -= 0.1f; // Уменьшаем громкость на 10%
-					if (currentVolume < 0.0f) currentVolume = 0.0f; // Минимальная громкость - 0%
-					hr = systemController_.SetSystemVolume(currentVolume);
-					if (FAILED(hr)) {
-						std::cout << "Failed to set volume (error - " << hr << " )" << std::endl;
-					}
-				}
-			}
-		}
-		else
-		{
-			std::cout << "command не найден!" << std::endl;
-		}
+	// Создаём буфер с 4-байтным заголовком (network byte order) + тело
+	auto buffer = std::make_shared<std::vector<char>>(4 + length);
+	std::memcpy(buffer->data(), &net_length, 4);
+	if (length > 0) {
+		std::memcpy(buffer->data() + 4, body.data(), length);
 	}
-	else
-	{
-		std::cout << "Полученные данные не являются JSON объектом." << std::endl;
-	}
+
+	// Делаем асинхронную отправку. захватываем shared_ptr на буфер и self, чтобы данные и сессия оставались живы до завершения
+	auto self = shared_from_this();
+	boost::asio::async_write(socket_, boost::asio::buffer(*buffer),
+		[this, self, buffer](const boost::system::error_code& error, const std::size_t bytes){
+			if (error) {
+				std::cout << "Error sending JSON (error - " << error.what() << " )" << std::endl;
+				return;
+			}
+		});
+}
+//загружаем данные(текущая песня громкость и тд)
+void Session::load_data()
+{
+	//получаем информацию о текущей песне
+	boost::json::value mediaInfo = systemController_.GetMedia();
+	
+	//получаем текущую громкость
+	float currentVolume{};
+	systemController_.GetSystemVolume(&currentVolume);
+	std::string pcName = systemController_.Get_PC_Name();
+
+
+	sendJson({
+		{"mediaInfo", mediaInfo},
+		{"volume", currentVolume},
+		{"pcName", pcName}
+	});
+}
+//бесконечный таймер для загрузки данных(текущая песня громкость и тд)
+void Session::recursiveTimer(boost::asio::steady_timer& timer)
+{
+	//установка таймера на 500 миллисекунд
+	timer.expires_after(std::chrono::milliseconds(500));
+
+	//запускаем
+	timer.async_wait([&timer,this](const boost::system::error_code& ec) {
+		if (ec) return;
+		load_data();
+
+		//рекурсия(бесконечность)
+		recursiveTimer(timer);
+	});
 }

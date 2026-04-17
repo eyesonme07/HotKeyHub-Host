@@ -1,9 +1,16 @@
 ﻿#include<iostream>
 #include"../header/server.h"
 #include<boost/asio.hpp>
+#include"../header/systemController.h"
 
 int main() {
-	setlocale(LC_ALL, "ru");
+	SetConsoleOutputCP(CP_UTF8);
+	SetConsoleCP(CP_UTF8);
+
+	SystemController systemController;
+
+	systemController.GetMedia();
+
 	try
 	{
 		boost::asio::io_context io;

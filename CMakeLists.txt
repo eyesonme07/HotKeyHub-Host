@@ -10,7 +10,6 @@ project("HotKeyHub_Host")
 set(BOOST_ROOT "C:/Boost/boost_1_90_0")
 find_package(Boost REQUIRED)
 
-# === Создаём цель ===
 add_executable(HotKeyHub_Host 
     "src/cpp/main.cpp"
     "src/cpp/server.cpp"
@@ -19,7 +18,7 @@ add_executable(HotKeyHub_Host
     "src/header/server.h"
     "src/header/session.h"
     "src/header/systemController.h"
-)
+ "src/header/jsonParse.h" "src/cpp/jsonParse.cpp")
 
 target_compile_definitions(HotKeyHub_Host PRIVATE 
     BOOST_JSON_NO_LIB
