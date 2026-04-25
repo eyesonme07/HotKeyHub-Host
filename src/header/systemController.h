@@ -28,7 +28,7 @@ public:
 	//получаем громкость звука
 	HRESULT GetSystemVolume(float* volume);
 	//нажатие на кнопки
-	void SendMediaKey(WORD vkMedia);
+	void SendMediaKey(WORD vkMedia, bool keyDown = true);
 	//нажатие на мышку
 	void SendMouseClick(DWORD buttonDown, DWORD buttonUp);
 	//скролл мышки

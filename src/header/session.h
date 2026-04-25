@@ -17,8 +17,6 @@ public:
 	void do_read_header();
 	//а тут уже читаем полностью
 	void do_read_body(std::size_t length);
-	//тут парсим уже готовый json
-	void processJson(const boost::json::value &value);
 	//отправка json обратно клиенту(статус и т.д.)
 	void sendJson(const boost::json::value &value);
 	//загружаем данные(текущая песня громкость и тд)

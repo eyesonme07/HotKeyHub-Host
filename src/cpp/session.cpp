@@ -31,7 +31,7 @@ void Session::do_read_header()
 		[this,self](const boost::system::error_code& error, const std::size_t bytes){
 			//если ошибка
 			if (error) {
-				std::cout << "Error reading header (error - " << error.what() << " )" << '\n';
+				std::cout << "Client disconnected" << '\n';
 				return;
 			}
 

@@ -76,15 +76,12 @@ HRESULT SystemController::GetSystemVolume(float* volume)
 }
 
 //нажатие на клавиши 
-void SystemController::SendMediaKey(WORD vkMedia)
+void SystemController::SendMediaKey(WORD vkMedia,bool keyDown)
 {
     INPUT ip = { 0 };
     ip.type = INPUT_KEYBOARD;
     ip.ki.wVk = vkMedia;
-    ip.ki.dwFlags = 0;
-    SendInput(1, &ip, sizeof(INPUT));
-    
-    ip.ki.dwFlags = KEYEVENTF_KEYUP;
+    ip.ki.dwFlags = keyDown ? 0 : KEYEVENTF_KEYUP;
     SendInput(1, &ip, sizeof(INPUT));
 }
 
