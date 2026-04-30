@@ -74,6 +74,16 @@ HRESULT SystemController::GetSystemVolume(float* volume)
 
     return hr;
 }
+//нажатие на клавиши (для символов)
+void SystemController::SendUnicodeChar(wchar_t ch, bool keyDown)
+{
+    INPUT input = { 0 };
+    input.type = INPUT_KEYBOARD;
+    input.ki.wScan = ch;
+    input.ki.dwFlags = KEYEVENTF_UNICODE | (keyDown ? 0 : KEYEVENTF_KEYUP);
+
+    SendInput(1, &input, sizeof(INPUT));
+}
 
 //нажатие на клавиши 
 void SystemController::SendMediaKey(WORD vkMedia,bool keyDown)
@@ -170,4 +180,20 @@ std::string SystemController::Get_PC_Name()
     }
 
     return std::string();
+}
+
+wchar_t utf8ToWchar(const std::string& str)
+{
+    wchar_t wch = 0;
+
+    MultiByteToWideChar(
+        CP_UTF8,
+        0,
+        str.c_str(),
+        -1,
+        &wch,
+        1
+    );
+
+    return wch;
 }
